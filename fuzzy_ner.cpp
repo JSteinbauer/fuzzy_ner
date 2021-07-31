@@ -9,6 +9,7 @@
 #include <locale>
 #include <codecvt>
 #include <string>
+#include <omp.h>
 #include "utils/timer.hpp"
 
 #include "edlib.h"
@@ -17,6 +18,7 @@
 #define THREAD_NUM 10
 omp_set_thread_num(THREAD_NUM); // set number of threads in
 */
+
 using namespace std;
 
 
@@ -102,7 +104,7 @@ class FuzzyNer {
                     if (edit_distance_result.status == EDLIB_STATUS_OK) {
                         float synonym_score = 1. - (float) edit_distance_result.editDistance/max_length;
                         if (synonym_score >= min_score) {
-                            cout << synonyms[index] << " , score : " << synonym_score << endl;
+                            // cout << synonyms[index] << " , score : " << synonym_score << endl;
                         }
                     }
                 }
@@ -204,25 +206,33 @@ int main() {
     timer.stop();
     cout << "time (ms) " << timer.elapsedMilliseconds() << endl;
 
+    //string test_string = "Sait";
     string test_string = "Saitensteterstraße";
     vector<string> test_strings;
+
     for (int i = 0; i < 100; ++i) {
-        if (i < 40) {
-            test_strings.push_back("Saitensteterstraße");
-        }
-        else if (i < 70) {
+        if (i < 50) {
             test_strings.push_back("Saitensteterstraße");
         }
         else {
-            test_strings.push_back("Saitensteterstraße");
+            test_strings.push_back("Sait");
         }
     }
-
+    /*
+    for (int i = 0; i < 100; ++i) {
+        if (i % 2 == 0) {
+            test_strings.push_back("Saitensteterstraße");
+        }
+        else {
+            test_strings.push_back("Sait");
+        }
+    }
+    */
     timer.start();
 
     //#pragma omp parallel for
     for (int i = 0; i < 100; ++i) {
-        test->find_matches(test_string, 0.8);
+        test->find_matches(test_strings[i], 0.8);
     }
     timer.stop();
     cout << "time (ms) " << timer.elapsedMilliseconds() << endl;
