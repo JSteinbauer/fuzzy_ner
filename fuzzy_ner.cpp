@@ -9,7 +9,10 @@
 #include <locale>
 #include <codecvt>
 #include <string>
+#include <limits.h>
 #include <omp.h>
+#include <regex>
+#include <algorithm>
 #include "utils/timer.hpp"
 
 #include "edlib.h"
@@ -30,6 +33,12 @@ struct EntityValue {
 struct EntityType {
     string name;
     list<EntityValue> entity_values;
+};
+
+struct EntityAnnotation {
+    string synonym;
+    string annotation;
+    float score;
 };
 
 
@@ -78,8 +87,9 @@ class FuzzyNer {
 		void find_matches(string& text, float min_score) {
 		    short unsigned int text_length = text.size();
 		    short unsigned int min_length = text_length*min_score;
-		    short unsigned int max_length = text_length/min_score;
+		    short unsigned int max_length = min_score > 0 ? text_length/min_score : USHRT_MAX;
 
+            bool edlib_memory_allocated = false;
 		    EdlibAlignResult edit_distance_result;
 
             wstring text_wstring = wstring_converter.from_bytes(text);
@@ -100,17 +110,20 @@ class FuzzyNer {
                 }
 
                 if (consider_synonym_for_similarity_match(char_frequency, index, max_length, min_score)) {
+                    edlib_memory_allocated = true;
                     edit_distance_result = edlibAlign(text.c_str(), text_length, synonyms[index].c_str(), *it, edlibDefaultAlignConfig());
                     if (edit_distance_result.status == EDLIB_STATUS_OK) {
                         float synonym_score = 1. - (float) edit_distance_result.editDistance/max_length;
                         if (synonym_score >= min_score) {
-                            // cout << synonyms[index] << " , score : " << synonym_score << endl;
+                            cout << synonyms[index] << " , score : " << synonym_score << endl;
                         }
                     }
                 }
 
 		    }
-		    edlibFreeAlignResult(edit_distance_result);
+		    if (edlib_memory_allocated) {
+		        edlibFreeAlignResult(edit_distance_result);
+		    }
 		}
 
         bool consider_synonym_for_similarity_match(map<unsigned short, unsigned short>& char_frequency, int index, unsigned int max_length, float min_score) {
@@ -187,6 +200,9 @@ int main() {
 //    list<string> synonyms {"Hello", "you", "dog"};
     list<string> synonyms = read_synonyms("/home/jsteinbauer/ondewo/ondewo-cai/data/gazetteers/street_name_vienna/all.txt");
 
+    list<string> substrings = read_synonyms("/home/jsteinbauer/Codes/cpp_snippets/fuzzy_ner/test_strings.txt");
+    vector<string> substrings_vec;
+    copy(substrings.begin(), substrings.end(), back_inserter(substrings_vec));
     /*
     EntityValue test = {"Hello", synonyms};
 
@@ -204,12 +220,13 @@ int main() {
     test->print_word_sizes();
     */
     timer.stop();
-    cout << "time (ms) " << timer.elapsedMilliseconds() << endl;
+    cout << "time for initialization (ms) " << timer.elapsedMilliseconds() << endl;
 
     //string test_string = "Sait";
     string test_string = "Saitensteterstraße";
     vector<string> test_strings;
 
+/*
     for (int i = 0; i < 100; ++i) {
         if (i < 50) {
             test_strings.push_back("Saitensteterstraße");
@@ -218,7 +235,8 @@ int main() {
             test_strings.push_back("Sait");
         }
     }
-    /*
+    */
+
     for (int i = 0; i < 100; ++i) {
         if (i % 2 == 0) {
             test_strings.push_back("Saitensteterstraße");
@@ -227,13 +245,23 @@ int main() {
             test_strings.push_back("Sait");
         }
     }
-    */
-    timer.start();
 
-    //#pragma omp parallel for
-    for (int i = 0; i < 100; ++i) {
-        test->find_matches(test_strings[i], 0.8);
+    timer.start();
+/*
+    string ts = "stree in vienna is Saitensteterstraße";
+    test->find_matches(ts, 0.78);
+*/
+
+    // using built-in random generator:
+    std::random_shuffle ( substrings_vec.begin(), substrings_vec.end() );
+
+
+    #pragma omp parallel for
+    for (int i = 0; i<28; ++i) {
+//        cout << substrings_vec[i] << endl;
+        test->find_matches(substrings_vec[i], 0.78);
     }
+
     timer.stop();
     cout << "time (ms) " << timer.elapsedMilliseconds() << endl;
     return 0;
