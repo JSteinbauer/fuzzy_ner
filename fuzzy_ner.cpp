@@ -84,6 +84,15 @@ class FuzzyNer {
 		    }
 		}
 
+		void find_matches_split(string& text, float min_score) {
+		    vector<string> split_text = this->get_substrings(text);
+
+		    #pragma omp parallel for
+		    for (int i = 0; i < split_text.size(); ++i) {
+		        this->find_matches(split_text[i], min_score);
+		    }
+		}
+
 		void find_matches(string& text, float min_score) {
 		    short unsigned int text_length = text.size();
 		    short unsigned int min_length = text_length*min_score;
@@ -138,6 +147,34 @@ class FuzzyNer {
             return true;
         }
 
+        vector<string> get_substrings(string text) {
+            sregex_token_iterator iter(text.begin(), text.end(), delimiter_rgx, {-1,0});
+            sregex_token_iterator end;
+
+            vector<string> split_string;
+            vector<int> indices;
+            int i = 0;
+            for ( ; iter != end; ++iter) {
+                split_string.push_back(*iter);
+                if (!regex_match((string) *iter, delimiter_rgx)) {
+                    indices.push_back(i);
+                }
+                i++;
+            }
+
+            vector<string> substrings;
+            for (int i = 1; i < indices.size(); ++i) {
+                for (int k = 0; k < indices.size() - i; ++k) {
+                    string substring("");
+                    for (int n = indices[k]; n < indices[k+i]; ++n) {
+                        substring += split_string[n];
+                    }
+                    substrings.push_back(substring);
+                }
+            }
+            return substrings;
+        }
+
         // Printing methods
 		void print_synonyms() {
 		    for (vector<string>::iterator i = synonyms.begin(); i != synonyms.end(); ++i) {
@@ -167,6 +204,7 @@ class FuzzyNer {
 		    }
 		}
 
+        static regex delimiter_rgx("\\s+");
 
 	private:
 	    vector<string> synonyms;
@@ -196,7 +234,19 @@ list<string> read_synonyms(string directory) {
     return synonym_list;
 }
 
+
+
+
 int main() {
+    /*
+    string string_to_split = "This is  a string to split";
+    vector<string> split_string = get_substrings(string_to_split);
+    for (vector<string>::iterator it = split_string.begin(); it != split_string.end(); ++it) {
+        cout << *it << endl;
+    }
+    */
+
+
 //    list<string> synonyms {"Hello", "you", "dog"};
     list<string> synonyms = read_synonyms("/home/jsteinbauer/ondewo/ondewo-cai/data/gazetteers/street_name_vienna/all.txt");
 
@@ -215,6 +265,15 @@ int main() {
     Timer timer;
     timer.start();
     FuzzyNer *test = new FuzzyNer(synonyms);
+    /*
+    test->print_word_vectors();
+    test->print_word_sizes();
+    */
+    timer.stop();
+
+    timer.start();
+    string test_text ("My favorite stree in vienna is Seitensteterstrasse");
+    test->find_matches_split(test_text, 0.78);
     /*
     test->print_word_vectors();
     test->print_word_sizes();
