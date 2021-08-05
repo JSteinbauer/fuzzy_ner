@@ -47,6 +47,7 @@ class FuzzyNer {
 		FuzzyNer(list<string> &synonyms) {
 		    copy(synonyms.begin(), synonyms.end(), back_inserter(this->synonyms));
 		    this->prepare_word_vectors();
+		    delimiter_rgx = new regex("\\s+");
 		}
 		~FuzzyNer() {
 		}
@@ -148,7 +149,7 @@ class FuzzyNer {
         }
 
         vector<string> get_substrings(string text) {
-            sregex_token_iterator iter(text.begin(), text.end(), delimiter_rgx, {-1,0});
+            sregex_token_iterator iter(text.begin(), text.end(), *delimiter_rgx, {-1,0});
             sregex_token_iterator end;
 
             vector<string> split_string;
@@ -156,17 +157,17 @@ class FuzzyNer {
             int i = 0;
             for ( ; iter != end; ++iter) {
                 split_string.push_back(*iter);
-                if (!regex_match((string) *iter, delimiter_rgx)) {
+                if (!regex_match((string) *iter, *delimiter_rgx)) {
                     indices.push_back(i);
                 }
                 i++;
             }
 
             vector<string> substrings;
-            for (int i = 1; i < indices.size(); ++i) {
+            for (int i = 0; i < indices.size(); ++i) {
                 for (int k = 0; k < indices.size() - i; ++k) {
                     string substring("");
-                    for (int n = indices[k]; n < indices[k+i]; ++n) {
+                    for (int n = indices[k]; n < indices[k+i]+1; ++n) {
                         substring += split_string[n];
                     }
                     substrings.push_back(substring);
@@ -204,7 +205,7 @@ class FuzzyNer {
 		    }
 		}
 
-        static regex delimiter_rgx("\\s+");
+        regex* delimiter_rgx;
 
 	private:
 	    vector<string> synonyms;
@@ -314,7 +315,7 @@ int main() {
     // using built-in random generator:
     std::random_shuffle ( substrings_vec.begin(), substrings_vec.end() );
 
-
+/*
     #pragma omp parallel for
     for (int i = 0; i<28; ++i) {
 //        cout << substrings_vec[i] << endl;
@@ -323,5 +324,6 @@ int main() {
 
     timer.stop();
     cout << "time (ms) " << timer.elapsedMilliseconds() << endl;
+    */
     return 0;
 }
