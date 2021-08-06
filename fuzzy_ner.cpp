@@ -85,16 +85,19 @@ class FuzzyNer {
 		    }
 		}
 
-		void find_matches_split(string& text, float min_score) {
+		void find_matches(string& text, float min_score) {
 		    vector<string> split_text = this->get_substrings(text);
+
+            // randomly shuffle split text to increase efficiency of parallel for loop
+            std::random_shuffle ( split_text.begin(), split_text.end() );
 
 		    #pragma omp parallel for
 		    for (int i = 0; i < split_text.size(); ++i) {
-		        this->find_matches(split_text[i], min_score);
+		        this->find_matches_single_word(split_text[i], min_score);
 		    }
 		}
 
-		void find_matches(string& text, float min_score) {
+		void find_matches_single_word(string& text, float min_score) {
 		    short unsigned int text_length = text.size();
 		    short unsigned int min_length = text_length*min_score;
 		    short unsigned int max_length = min_score > 0 ? text_length/min_score : USHRT_MAX;
@@ -274,7 +277,7 @@ int main() {
 
     timer.start();
     string test_text ("My favorite stree in vienna is Seitensteterstrasse");
-    test->find_matches_split(test_text, 0.78);
+    test->find_matches(test_text, 0.78);
     /*
     test->print_word_vectors();
     test->print_word_sizes();
@@ -309,7 +312,7 @@ int main() {
     timer.start();
 /*
     string ts = "stree in vienna is Saitensteterstraße";
-    test->find_matches(ts, 0.78);
+    test->find_matches_single_word(ts, 0.78);
 */
 
     // using built-in random generator:
@@ -319,7 +322,7 @@ int main() {
     #pragma omp parallel for
     for (int i = 0; i<28; ++i) {
 //        cout << substrings_vec[i] << endl;
-        test->find_matches(substrings_vec[i], 0.78);
+        test->find_matches_single_word(substrings_vec[i], 0.78);
     }
 
     timer.stop();
