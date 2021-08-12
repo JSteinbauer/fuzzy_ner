@@ -25,17 +25,7 @@ omp_set_thread_num(THREAD_NUM); // set number of threads in
 using namespace std;
 
 
-struct EntityValue {
-    string value;
-    list<string> synonyms;
-};
-
-struct EntityType {
-    string name;
-    list<EntityValue> entity_values;
-};
-
-struct EntityAnnotation {
+struct EntityMatch {
     string synonym;
     string annotation;
     float score;
@@ -85,19 +75,39 @@ class FuzzyNer {
 		    }
 		}
 
-		void find_matches(string& text, float min_score) {
+		vector<EntityMatch> find_matches(string& text, float min_score) {
 		    vector<string> split_text = this->get_substrings(text);
 
             // randomly shuffle split text to increase efficiency of parallel for loop
             std::random_shuffle ( split_text.begin(), split_text.end() );
 
-		    #pragma omp parallel for
-		    for (int i = 0; i < split_text.size(); ++i) {
-		        this->find_matches_single_word(split_text[i], min_score);
+            vector<EntityMatch> entity_matches;
+            #pragma omp parallel
+            {
+                vector<EntityMatch> entity_matches_slave;
+                #pragma omp for nowait
+                for (int i = 0; i < split_text.size(); ++i) {
+                    vector<EntityMatch> new_entity_matches = this->find_matches_single_word(split_text[i], min_score);
+                    entity_matches_slave.insert(
+                        entity_matches_slave.end(),
+                        make_move_iterator(new_entity_matches.begin()),
+                        make_move_iterator(new_entity_matches.end())
+                    );
+                }
+                #pragma omp critical
+                {
+                    entity_matches.insert(
+                        entity_matches.end(),
+                        make_move_iterator(entity_matches_slave.begin()),
+                        make_move_iterator(entity_matches_slave.end())
+                    );
+                }
 		    }
+		    return entity_matches;
 		}
 
-		void find_matches_single_word(string& text, float min_score) {
+		vector<EntityMatch> find_matches_single_word(string& text, float min_score) {
+
 		    short unsigned int text_length = text.size();
 		    short unsigned int min_length = text_length*min_score;
 		    short unsigned int max_length = min_score > 0 ? text_length/min_score : USHRT_MAX;
@@ -113,7 +123,8 @@ class FuzzyNer {
                 ? 1 : char_frequency[char_map[text_wstring[n]]]+1;
 		    }
 
-		    vector<string> match_candidates;
+            EntityMatch new_entity_match;
+		    vector<EntityMatch> match_candidates;
 		    for (vector<unsigned short>::iterator it = synonym_sizes.begin(); it != synonym_sizes.end(); ++it) {
                 int index = it - synonym_sizes.begin();
                 unsigned int max_length = max(text_length, *it);
@@ -128,7 +139,10 @@ class FuzzyNer {
                     if (edit_distance_result.status == EDLIB_STATUS_OK) {
                         float synonym_score = 1. - (float) edit_distance_result.editDistance/max_length;
                         if (synonym_score >= min_score) {
-                            cout << synonyms[index] << " , score : " << synonym_score << endl;
+                            new_entity_match = {.synonym = synonyms[index], .annotation = text, .score = synonym_score};
+                            //lock_guard<mutex> guard(entity_matches_mutex);
+                            match_candidates.push_back(new_entity_match);
+//                            cout << synonyms[index] << " , score : " << synonym_score << endl;
                         }
                     }
                 }
@@ -137,6 +151,7 @@ class FuzzyNer {
 		    if (edlib_memory_allocated) {
 		        edlibFreeAlignResult(edit_distance_result);
 		    }
+		    return match_candidates;
 		}
 
         bool consider_synonym_for_similarity_match(map<unsigned short, unsigned short>& char_frequency, int index, unsigned int max_length, float min_score) {
@@ -277,7 +292,7 @@ int main() {
 
     timer.start();
     string test_text ("My favorite stree in vienna is Seitensteterstrasse");
-    test->find_matches(test_text, 0.78);
+    vector<EntityMatch> results = test->find_matches(test_text, 0.78);
     /*
     test->print_word_vectors();
     test->print_word_sizes();
@@ -285,48 +300,12 @@ int main() {
     timer.stop();
     cout << "time for initialization (ms) " << timer.elapsedMilliseconds() << endl;
 
+    for (vector<EntityMatch>::iterator it = results.begin(); it != results.end(); ++it) {
+        cout << it->synonym << " " << it->annotation << " " << it->score << endl;
+    }
     //string test_string = "Sait";
     string test_string = "Saitensteterstraße";
     vector<string> test_strings;
 
-/*
-    for (int i = 0; i < 100; ++i) {
-        if (i < 50) {
-            test_strings.push_back("Saitensteterstraße");
-        }
-        else {
-            test_strings.push_back("Sait");
-        }
-    }
-    */
-
-    for (int i = 0; i < 100; ++i) {
-        if (i % 2 == 0) {
-            test_strings.push_back("Saitensteterstraße");
-        }
-        else {
-            test_strings.push_back("Sait");
-        }
-    }
-
-    timer.start();
-/*
-    string ts = "stree in vienna is Saitensteterstraße";
-    test->find_matches_single_word(ts, 0.78);
-*/
-
-    // using built-in random generator:
-    std::random_shuffle ( substrings_vec.begin(), substrings_vec.end() );
-
-/*
-    #pragma omp parallel for
-    for (int i = 0; i<28; ++i) {
-//        cout << substrings_vec[i] << endl;
-        test->find_matches_single_word(substrings_vec[i], 0.78);
-    }
-
-    timer.stop();
-    cout << "time (ms) " << timer.elapsedMilliseconds() << endl;
-    */
     return 0;
 }
