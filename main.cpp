@@ -25,9 +25,6 @@ list<string> read_synonyms(string directory) {
     return synonym_list;
 }
 
-
-
-
 int main() {
     /*
     string string_to_split = "This is  a string to split";
