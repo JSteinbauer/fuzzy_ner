@@ -33,11 +33,6 @@ class FuzzyNer {
 		FuzzyNer(list<string> &synonyms);
 		~FuzzyNer();
 
-		void build_char_map();
-
-        // Prepares vectors of character occurrences and length for each synonym
-		void prepare_word_vectors();
-
 		vector<EntityMatch> find_matches(string& text, float min_score);
 		vector<EntityMatch> find_matches_single_word(string& text, float min_score);
 
@@ -46,12 +41,16 @@ class FuzzyNer {
 
         // Printing methods
 		void print_synonyms();
-		void print_ascii();
 		void print_word_vectors();
 		void print_word_sizes();
 
         regex* delimiter_rgx;
 	private:
+        // Prepares vectors of character occurrences and length for each synonym
+		void prepare_word_vectors();
+
+		void build_char_map();
+
 	    vector<string> synonyms;
 	    vector<unsigned short> synonym_sizes;
 	    vector<vector<unsigned short>> synonym_vectors;

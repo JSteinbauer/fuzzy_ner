@@ -162,19 +162,11 @@ vector<string> FuzzyNer::get_substrings(string text) {
 
 // Printing methods
 void FuzzyNer::print_synonyms() {
-    for (vector<string>::iterator i = synonyms.begin(); i != synonyms.end(); ++i) {
-        cout << *i << endl;
-    }
-}
-void FuzzyNer::print_ascii() {
     for (vector<string>::iterator it = synonyms.begin(); it != synonyms.end(); ++it) {
-        for (char const &c: *it) {
-            cout << int(c) << ' ';
-        }
-        cout << endl;
+        cout << *it << endl;
     }
-
 }
+
 void FuzzyNer::print_word_vectors() {
     for (vector<vector<unsigned short>>::iterator it = synonym_vectors.begin(); it != synonym_vectors.end(); ++it) {
         for (unsigned short const &c: *it) {
