@@ -1,5 +1,6 @@
 
 setup_edlib:
+	git submodule update --init
 	cd edlib/build && cmake -D CMAKE_BUILD_TPE=Release .. && make
 
 build_test:
